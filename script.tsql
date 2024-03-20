@@ -1,0 +1,33 @@
+-- Standalone case
+EXEC sp_create_plan_guide @name = N'Guide1', 
+@stmt = N'<your statement>', 
+@type = N'OBJECT', 
+@module_or_batch = N'<your procedure>', 
+@params = NULL, 
+@hints = N'OPTION (USE PLAN N''<your plan>'')'
+
+--- AG case
+-- Inspect the query plan by using dynamic management views.  
+SELECT * FROM sys.dm_exec_query_stats AS qs  
+CROSS APPLY sys.dm_exec_sql_text(sql_handle)  
+CROSS APPLY sys.dm_exec_text_query_plan(qs.plan_handle, qs.statement_start_offset, qs.statement_end_offset) AS qp  
+WHERE text LIKE N'YOUR_SP_NAMEe%' --and statement_end_offset = 844;  
+GO 
+ 
+-- Create a plan guide for the query by specifying the query plan in the plan cache.  
+DECLARE @plan_handle varbinary(64);  
+DECLARE @offset int;  
+
+SELECT @plan_handle = plan_handle, @offset = qs.statement_start_offset  
+FROM sys.dm_exec_query_stats AS qs  
+CROSS APPLY sys.dm_exec_sql_text(sql_handle) AS st  
+CROSS APPLY sys.dm_exec_text_query_plan(qs.plan_handle, qs.statement_start_offset, qs.statement_end_offset) AS qp  
+WHERE text LIKE N'YOUR_SP_NAMEe%' --and statement_end_offset = 844; 
+  
+EXECUTE sp_create_plan_guide_from_handle   
+    @name =  N'Guide1',  
+    @plan_handle = @plan_handle,  
+    @statement_start_offset = @offset;  
+GO  
+-- Verify that the plan guide is created.  
+SELECT * FROM sys.plan_guides  
